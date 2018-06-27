@@ -871,7 +871,9 @@ kni_free_kni(uint16_t port_id)
 
 	for (i = 0; i < p[port_id]->nb_kni; i++) {
 		if (rte_kni_release(p[port_id]->kni[i]))
-			printf("Fail to release kni\n");
+			printf("Failed to release kni\n");
+		if (rte_kni_free(p[port_id]->kni[i]))
+			printf("Failed to free kni\n");
 		p[port_id]->kni[i] = NULL;
 	}
 	rte_eth_dev_stop(port_id);
