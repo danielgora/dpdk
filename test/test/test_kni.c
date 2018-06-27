@@ -521,6 +521,12 @@ test_kni_processing(uint16_t port_id, struct rte_mempool *mp)
 		goto fail_kni;
 	}
 
+	/* test of freeing an unreleased kni device */
+	if (rte_kni_free(kni) == 0) {
+		printf("should not be able to free an unreleased kni device\n");
+		return -1;
+	}
+
 	if (rte_kni_release(kni) < 0) {
 		printf("fail to release kni\n");
 		return -1;
@@ -530,6 +536,12 @@ test_kni_processing(uint16_t port_id, struct rte_mempool *mp)
 	/* test of releasing a released kni device */
 	if (rte_kni_release(kni) == 0) {
 		printf("should not release a released kni device\n");
+		return -1;
+	}
+
+	/* test of freeing a released kni device */
+	if (rte_kni_free(kni) != 0) {
+		printf("failed to free a released kni device\n");
 		return -1;
 	}
 
@@ -689,6 +701,14 @@ test_kni(void)
 	if (ret == 0) {
 		ret = -1;
 		printf("unexpectedly release kni successfully\n");
+		goto fail;
+	}
+
+	/* test of freeing NULL kni context */
+	ret = rte_kni_free(NULL);
+	if (ret == 0) {
+		ret = -1;
+		printf("unexpectedly freed kni successfully\n");
 		goto fail;
 	}
 
