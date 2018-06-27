@@ -465,10 +465,12 @@ eth_kni_remove(struct rte_vdev_device *vdev)
 	if (eth_dev == NULL)
 		return -1;
 
-	eth_kni_dev_stop(eth_dev);
-
 	internals = eth_dev->data->dev_private;
 	rte_kni_release(internals->kni);
+
+	eth_kni_dev_stop(eth_dev);
+
+	rte_kni_free(internals->kni);
 
 	rte_free(internals);
 
