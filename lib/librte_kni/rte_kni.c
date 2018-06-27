@@ -560,7 +560,11 @@ rte_kni_handle_request(struct rte_kni *kni)
 	unsigned int ret;
 	struct rte_kni_request *req = NULL;
 
-	if (kni == NULL)
+	/*
+	 * Don't touch the req/resp fifos after
+	 * we've been released, we can be freed at any instant!
+	 */
+	if (kni == NULL || !kni->in_use)
 		return -1;
 
 	/* Get request mbuf */

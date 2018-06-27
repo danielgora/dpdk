@@ -164,6 +164,10 @@ rte_kni_free(struct rte_kni *kni);
  * Then analyzes it and calls the specific actions for the specific requests.
  * Finally constructs the response mbuf and puts it back to the resp_q.
  *
+ * Thread Safety: This function should be called in a separate thread from the
+ * thread which calls rte_kni_release() for this KNI.  This function must not
+ * be called simultaneously with rte_kni_free().
+ *
  * @param kni
  *  The pointer to the context of an existent KNI interface.
  *
