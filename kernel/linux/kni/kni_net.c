@@ -26,7 +26,7 @@
 
 #define WD_TIMEOUT 5 /*jiffies */
 
-#define KNI_WAIT_RESPONSE_TIMEOUT 300 /* 3 seconds */
+#define KNI_WAIT_RESPONSE_TIMEOUT 10 /* 10 seconds */
 
 /* typedef for rx function */
 typedef void (*kni_net_rx_t)(struct kni_dev *kni);
@@ -126,7 +126,8 @@ kni_net_process_request(struct kni_dev *kni, struct rte_kni_request *req)
 	}
 
 	ret_val = wait_event_interruptible_timeout(kni->wq,
-			kni_fifo_count(kni->resp_q), 3 * HZ);
+			kni_fifo_count(kni->resp_q),
+			KNI_WAIT_RESPONSE_TIMEOUT * HZ);
 	if (signal_pending(current) || ret_val <= 0) {
 		ret = -ETIME;
 		goto fail;
