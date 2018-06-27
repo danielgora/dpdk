@@ -185,8 +185,6 @@ kni_dev_remove(struct kni_dev *dev)
 		free_netdev(dev->net_dev);
 	}
 
-	kni_net_release_fifo_phy(dev);
-
 	return 0;
 }
 
@@ -217,6 +215,7 @@ kni_release(struct inode *inode, struct file *file)
 		}
 
 		kni_dev_remove(dev);
+		kni_net_release_fifo_phy(dev);
 		list_del(&dev->list);
 	}
 	up_write(&knet->kni_list_lock);
@@ -256,7 +255,6 @@ kni_run_thread(struct kni_net *knet, struct kni_dev *kni, uint8_t force_bind)
 		kni->pthread = kthread_create(kni_thread_multiple,
 			(void *)kni, "kni_%s", kni->name);
 		if (IS_ERR(kni->pthread)) {
-			kni_dev_remove(kni);
 			return -ECANCELED;
 		}
 
@@ -271,7 +269,6 @@ kni_run_thread(struct kni_net *knet, struct kni_dev *kni, uint8_t force_bind)
 				(void *)knet, "kni_single");
 			if (IS_ERR(knet->kni_kthread)) {
 				mutex_unlock(&knet->kni_kthread_lock);
-				kni_dev_remove(kni);
 				return -ECANCELED;
 			}
 
@@ -421,8 +418,7 @@ kni_ioctl_create(struct net *net, uint32_t ioctl_num,
 	if (ret) {
 		pr_err("error %i registering device \"%s\"\n",
 					ret, dev_info.name);
-		kni->net_dev = NULL;
-		kni_dev_remove(kni);
+		kni_net_release_fifo_phy(kni);
 		free_netdev(net_dev);
 		return -ENODEV;
 	}
@@ -430,8 +426,11 @@ kni_ioctl_create(struct net *net, uint32_t ioctl_num,
 	netif_carrier_off(net_dev);
 
 	ret = kni_run_thread(knet, kni, dev_info.force_bind);
-	if (ret != 0)
+	if (ret != 0) {
+		kni_dev_remove(kni);
+		kni_net_release_fifo_phy(kni);
 		return ret;
+	}
 
 	down_write(&knet->kni_list_lock);
 	list_add(&kni->list, &knet->kni_list_head);
@@ -459,6 +458,46 @@ kni_ioctl_release(struct net *net, uint32_t ioctl_num,
 	if (strlen(dev_info.name) == 0)
 		return -EINVAL;
 
+	down_read(&knet->kni_list_lock);
+	list_for_each_entry_safe(dev, n, &knet->kni_list_head, list) {
+		if (strncmp(dev->name, dev_info.name, RTE_KNI_NAMESIZE) != 0)
+			continue;
+
+		kni_dev_remove(dev);
+		up_read(&knet->kni_list_lock);
+		pr_info("Successfully released kni interface: %s\n",
+			dev_info.name);
+		return 0;
+	}
+	up_read(&knet->kni_list_lock);
+	pr_info("Error: failed to find kni interface: %s\n",
+		dev_info.name);
+
+	return ret;
+}
+
+static int
+kni_ioctl_free(struct net *net, uint32_t ioctl_num,
+		unsigned long ioctl_param)
+{
+	struct kni_net *knet = net_generic(net, kni_net_id);
+	int ret = -EINVAL;
+	struct kni_dev *dev, *n;
+	struct rte_kni_device_info dev_info;
+
+	if (_IOC_SIZE(ioctl_num) > sizeof(dev_info))
+		return -EINVAL;
+
+	ret = copy_from_user(&dev_info, (void *)ioctl_param, sizeof(dev_info));
+	if (ret) {
+		pr_err("copy_from_user in kni_ioctl_release");
+		return -EIO;
+	}
+
+	/* Release the network device according to its name */
+	if (strlen(dev_info.name) == 0)
+		return ret;
+
 	down_write(&knet->kni_list_lock);
 	list_for_each_entry_safe(dev, n, &knet->kni_list_head, list) {
 		if (strncmp(dev->name, dev_info.name, RTE_KNI_NAMESIZE) != 0)
@@ -469,14 +508,17 @@ kni_ioctl_release(struct net *net, uint32_t ioctl_num,
 			dev->pthread = NULL;
 		}
 
-		kni_dev_remove(dev);
+		kni_net_release_fifo_phy(dev);
 		list_del(&dev->list);
-		ret = 0;
-		break;
+		up_write(&knet->kni_list_lock);
+		pr_info("Successfully freed kni interface: %s\n",
+			dev_info.name);
+		return 0;
 	}
 	up_write(&knet->kni_list_lock);
-	pr_info("%s release kni named %s\n",
-		(ret == 0 ? "Successfully" : "Unsuccessfully"), dev_info.name);
+
+	pr_info("Error: failed to find kni interface: %s\n",
+		dev_info.name);
 
 	return ret;
 }
@@ -501,6 +543,9 @@ kni_ioctl(struct inode *inode, uint32_t ioctl_num, unsigned long ioctl_param)
 		break;
 	case _IOC_NR(RTE_KNI_IOCTL_RELEASE):
 		ret = kni_ioctl_release(net, ioctl_num, ioctl_param);
+		break;
+	case _IOC_NR(RTE_KNI_IOCTL_FREE):
+		ret = kni_ioctl_free(net, ioctl_num, ioctl_param);
 		break;
 	default:
 		pr_debug("IOCTL default\n");
