@@ -463,14 +463,40 @@ int
 rte_kni_release(struct rte_kni *kni)
 {
 	struct rte_kni_device_info dev_info;
-	uint32_t slot_id;
-	uint32_t retry = 5;
 
 	if (!kni || !kni->in_use)
 		return -1;
 
 	snprintf(dev_info.name, sizeof(dev_info.name), "%s", kni->name);
 	if (ioctl(kni_fd, RTE_KNI_IOCTL_RELEASE, &dev_info) < 0) {
+		RTE_LOG(ERR, KNI, "Fail to release kni device\n");
+		return -1;
+	}
+
+	kni->in_use = 0;
+	return 0;
+}
+
+int
+rte_kni_free(struct rte_kni *kni)
+{
+	uint32_t slot_id;
+	uint32_t retry = 5;
+	struct rte_kni_device_info dev_info;
+
+	if (!kni)
+		return -EINVAL;
+
+	/* Must call rte_kni_release() first */
+	if (kni->in_use)
+		return -EBUSY;
+
+	/*
+	 * Free the FIFOs in the kernel and remove it from the list
+	 * of devices to poll
+	 */
+	snprintf(dev_info.name, sizeof(dev_info.name), "%s", kni->name);
+	if (ioctl(kni_fd, RTE_KNI_IOCTL_FREE, &dev_info) < 0) {
 		RTE_LOG(ERR, KNI, "Fail to release kni device\n");
 		return -1;
 	}
@@ -497,7 +523,7 @@ rte_kni_release(struct rte_kni *kni)
 	if (slot_id > kni_memzone_pool.max_ifaces) {
 		RTE_LOG(ERR, KNI, "KNI pool: corrupted slot ID: %d, max: %d\n",
 			slot_id, kni_memzone_pool.max_ifaces);
-		return -1;
+		return -EINVAL;
 	}
 	kni_memzone_pool_release(&kni_memzone_pool.slots[slot_id]);
 
