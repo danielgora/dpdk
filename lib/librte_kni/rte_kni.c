@@ -57,6 +57,7 @@ EAL_REGISTER_TAILQ(rte_kni_tailq)
  */
 struct rte_kni {
 	char name[RTE_KNI_NAMESIZE];        /**< KNI interface name */
+	uint16_t in_use : 1;                /**< KNI interface is in use */
 	uint16_t group_id;                  /**< Group ID of KNI devices */
 	uint32_t slot_id;                   /**< KNI pool slot ID */
 	struct rte_mempool *pktmbuf_pool;   /**< pkt mbuf mempool */
@@ -311,6 +312,7 @@ rte_kni_alloc(struct rte_mempool *pktmbuf_pool,
 	kni->pktmbuf_pool = pktmbuf_pool;
 	kni->group_id = conf->group_id;
 	kni->mbuf_size = conf->mbuf_size;
+	kni->in_use = 1;
 
 	dev_info.iova_mode = (rte_eal_iova_mode() == RTE_IOVA_VA) ? 1 : 0;
 
@@ -403,13 +405,35 @@ kni_free_fifo_phy(struct rte_mempool *mp, struct rte_kni_fifo *fifo)
 int
 rte_kni_release(struct rte_kni *kni)
 {
+	struct rte_kni_device_info dev_info;
+
+	if (!kni || !kni->in_use)
+		return -1;
+
+	snprintf(dev_info.name, sizeof(dev_info.name), "%s", kni->name);
+	if (ioctl(kni_fd, RTE_KNI_IOCTL_RELEASE, &dev_info) < 0) {
+		RTE_LOG(ERR, KNI, "Fail to release kni device\n");
+		return -1;
+	}
+
+	kni->in_use = 0;
+	return 0;
+}
+
+int
+rte_kni_free(struct rte_kni *kni)
+{
 	struct rte_tailq_entry *te;
 	struct rte_kni_list *kni_list;
 	struct rte_kni_device_info dev_info;
 	uint32_t retry = 5;
 
 	if (!kni)
-		return -1;
+		return -EINVAL;
+
+	/* Must call rte_kni_release() first */
+	if (kni->in_use)
+		return -EBUSY;
 
 	kni_list = RTE_TAILQ_CAST(rte_kni_tailq.head, rte_kni_list);
 
@@ -424,7 +448,7 @@ rte_kni_release(struct rte_kni *kni)
 		goto unlock;
 
 	strlcpy(dev_info.name, kni->name, sizeof(dev_info.name));
-	if (ioctl(kni_fd, RTE_KNI_IOCTL_RELEASE, &dev_info) < 0) {
+	if (ioctl(kni_fd, RTE_KNI_IOCTL_FREE, &dev_info) < 0) {
 		RTE_LOG(ERR, KNI, "Fail to release kni device\n");
 		goto unlock;
 	}
