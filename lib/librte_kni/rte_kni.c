@@ -13,7 +13,6 @@
 
 #include <rte_spinlock.h>
 #include <rte_string_fns.h>
-#include <rte_ethdev.h>
 #include <rte_malloc.h>
 #include <rte_log.h>
 #include <rte_kni.h>
@@ -817,6 +816,42 @@ rte_kni_unregister_handlers(struct rte_kni *kni)
 
 	return 0;
 }
+
+int
+rte_kni_update_link(struct rte_kni *kni, struct rte_eth_link *link)
+{
+	struct rte_kni_link_info link_info;
+
+	if (kni == NULL || !kni->in_use || link == NULL)
+		return -1;
+
+	snprintf(link_info.name, sizeof(link_info.name), "%s", kni->name);
+
+	link_info.link_speed = link->link_speed;
+	if (link->link_duplex == ETH_LINK_FULL_DUPLEX)
+		link_info.link_duplex = RTE_KNI_LINK_FULL_DUPLEX;
+	else
+		link_info.link_duplex = RTE_KNI_LINK_FULL_DUPLEX;
+
+	if (link->link_autoneg == ETH_LINK_FIXED)
+		link_info.link_autoneg = RTE_KNI_LINK_FIXED;
+	else
+		link_info.link_autoneg = RTE_KNI_LINK_AUTONEG;
+
+	if (link->link_status == ETH_LINK_UP)
+		link_info.link_status = RTE_KNI_LINK_UP;
+	else
+		link_info.link_status = RTE_KNI_LINK_DOWN;
+
+	if (ioctl(kni_fd, RTE_KNI_IOCTL_LINKSTAT, &link_info) < 0) {
+		RTE_LOG(ERR, KNI,
+			"Failed to update kni link info for dev '%s'.\n",
+			kni->name);
+		return -1;
+	}
+	return 0;
+}
+
 void
 rte_kni_close(void)
 {

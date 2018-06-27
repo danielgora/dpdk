@@ -124,11 +124,30 @@ struct rte_kni_device_info {
 	char mac_addr[6];
 };
 
+
+struct rte_kni_link_info {
+	char name[RTE_KNI_NAMESIZE];  /**< Network device name for KNI */
+	uint32_t link_speed;        /**< ETH_SPEED_NUM_ */
+
+#define RTE_KNI_LINK_HALF_DUPLEX 0 /**< Half-duplex connection. */
+#define RTE_KNI_LINK_FULL_DUPLEX 1 /**< Full-duplex connection. */
+	uint16_t link_duplex  : 1;  /**< RTE_KNI_LINK_[HALF/FULL]_DUPLEX */
+
+#define RTE_KNI_LINK_FIXED       0 /**< No autonegotiation. */
+#define RTE_KNI_LINK_AUTONEG     1 /**< Autonegotiated. */
+	uint16_t link_autoneg : 1;  /**< RTE_KNI_LINK_[AUTONEG/FIXED] */
+
+#define RTE_KNI_LINK_DOWN        0 /**< Link is down. */
+#define RTE_KNI_LINK_UP          1 /**< Link is up. */
+	uint16_t link_status  : 1;  /**< RTE_KNI_LINK_[DOWN/UP] */
+};
+
 #define KNI_DEVICE "kni"
 
 #define RTE_KNI_IOCTL_TEST    _IOWR(0, 1, int)
 #define RTE_KNI_IOCTL_CREATE  _IOWR(0, 2, struct rte_kni_device_info)
 #define RTE_KNI_IOCTL_RELEASE _IOWR(0, 3, struct rte_kni_device_info)
 #define RTE_KNI_IOCTL_FREE    _IOWR(0, 4, struct rte_kni_device_info)
+#define RTE_KNI_IOCTL_LINKSTAT _IOWR(0, 5, struct rte_kni_link_info)
 
 #endif /* _RTE_KNI_COMMON_H_ */
