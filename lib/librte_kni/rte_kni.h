@@ -121,11 +121,17 @@ struct rte_kni *rte_kni_alloc(struct rte_mempool *pktmbuf_pool,
 		const struct rte_kni_conf *conf, struct rte_kni_ops *ops);
 
 /**
- * Release KNI interface according to the context. It will also release the
- * paired KNI interface in kernel space. All processing on the specific KNI
- * context need to be stopped before calling this interface.
+ * Release specified KNI interface. This will stop data transfer to and from
+ * this interface and will remove the paired KNI interface in kernel space.
  *
- * rte_kni_release is thread safe.
+ * @note This function will trigger the kernel to remove the interface, which
+ * may trigger the RTE_KNI_REQ_CFG_NETWORK_IF KNI callback. This function will
+ * block until this callback is handled or times out. The user should ensure
+ * that rte_kni_handle_request() is called for this interface in a separate
+ * thread to handle this callback to avoid this delay.
+ *
+ * rte_kni_release() is thread safe, but should not be called from the same
+ * thread as rte_kni_handle_request().
  *
  * @param kni
  *  The pointer to the context of an existent KNI interface.
@@ -135,6 +141,23 @@ struct rte_kni *rte_kni_alloc(struct rte_mempool *pktmbuf_pool,
  *  - negative value indicates failure.
  */
 int rte_kni_release(struct rte_kni *kni);
+
+/**
+ * Free specified KNI interface. It will also free the KNI interface resources
+ * in kernel space. No KNI functions for this interface should be called after
+ * or at the same time as calling this function. rte_kni_release() must be
+ * called before this function to release the kernel interface.
+ *
+ * @param kni
+ *  pointer to struct rte_kni.
+ *
+ * @return
+ *  - 0 indicates success.
+ *  - -EINVAL: Invalid kni structure.
+ *  - -EBUSY: KNI interface still in use.  Must call rte_kni_release().
+ */
+int __rte_experimental
+rte_kni_free(struct rte_kni *kni);
 
 /**
  * It is used to handle the request mbufs sent from kernel space.
