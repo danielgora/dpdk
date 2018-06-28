@@ -43,6 +43,7 @@ struct kni_dev {
 
 	uint8_t iova_mode;
 
+	uint32_t registered;         /* 0 if already released, 1 otherwise */
 	uint32_t core_id;            /* Core ID to bind */
 	char name[RTE_KNI_NAMESIZE]; /* Network device name */
 	struct task_struct *pthread;
