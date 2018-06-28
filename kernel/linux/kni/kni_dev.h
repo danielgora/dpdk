@@ -40,6 +40,7 @@ struct kni_dev {
 	struct list_head list;
 
 	struct net_device_stats stats;
+	uint16_t registered;         /* 0 if already released, 1 otherwise */
 	uint16_t group_id;           /* Group ID of a group of KNI devices */
 	uint32_t core_id;            /* Core ID to bind */
 	char name[RTE_KNI_NAMESIZE]; /* Network device name */
