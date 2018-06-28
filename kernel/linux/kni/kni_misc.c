@@ -184,15 +184,32 @@ kni_dev_remove(struct kni_dev *dev)
 			ixgbe_kni_remove(dev->pci_dev);
 		else if (pci_match_id(igb_pci_tbl, dev->pci_dev))
 			igb_kni_remove(dev->pci_dev);
+		dev->pci_dev = NULL;
 	}
 #endif
 
-	if (dev->net_dev) {
+	if (dev->registered) {
 		unregister_netdev(dev->net_dev);
-		free_netdev(dev->net_dev);
+		dev->registered = 0;
 	}
 
 	return 0;
+}
+
+static void
+kni_dev_free(struct kni_dev *dev)
+{
+	struct net_device *net_dev;
+	/*
+	 * Remember that struct kni_dev is part of the netdev
+	 * structure, so we free *both* with free_netdev.
+	 */
+	if (dev == NULL)
+		return;
+	net_dev = dev->net_dev;
+	dev->net_dev = NULL;
+	if (net_dev)
+		free_netdev(net_dev);
 }
 
 static int
@@ -224,6 +241,7 @@ kni_release(struct inode *inode, struct file *file)
 		kni_dev_remove(dev);
 		kni_net_release_fifo_phy(dev);
 		list_del(&dev->list);
+		kni_dev_free(dev);
 	}
 	up_write(&knet->kni_list_lock);
 
@@ -457,10 +475,12 @@ kni_ioctl_create(struct net *net, uint32_t ioctl_num,
 	if (ret) {
 		pr_err("error %i registering device \"%s\"\n",
 					ret, dev_info.name);
+		kni_dev_remove(kni);
 		kni_net_release_fifo_phy(kni);
-		free_netdev(net_dev);
+		kni_dev_free(kni);
 		return -ENODEV;
 	}
+	kni->registered = 1;
 
 	netif_carrier_off(net_dev);
 
@@ -468,6 +488,7 @@ kni_ioctl_create(struct net *net, uint32_t ioctl_num,
 	if (ret != 0) {
 		kni_dev_remove(kni);
 		kni_net_release_fifo_phy(kni);
+		kni_dev_free(kni);
 		return ret;
 	}
 
@@ -552,6 +573,7 @@ kni_ioctl_free(struct net *net, uint32_t ioctl_num,
 
 		kni_net_release_fifo_phy(dev);
 		list_del(&dev->list);
+		kni_dev_free(dev);
 		up_write(&knet->kni_list_lock);
 		pr_info("Successfully freed kni interface: %s\n",
 			dev_info.name);
