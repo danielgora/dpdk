@@ -67,6 +67,7 @@ static const struct rte_eth_txconf tx_conf = {
 	},
 	.tx_free_thresh = 0,
 	.tx_rs_thresh = 0,
+	.txq_flags = ETH_TXQ_FLAGS_IGNORE,
 };
 
 static const struct rte_eth_conf port_conf = {
