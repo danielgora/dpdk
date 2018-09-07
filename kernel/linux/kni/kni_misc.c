@@ -466,6 +466,8 @@ kni_ioctl_create(struct net *net, uint32_t ioctl_num,
 		return -ENODEV;
 	}
 
+	netif_carrier_off(net_dev);
+
 	ret = kni_run_thread(knet, kni, dev_info.force_bind);
 	if (ret != 0)
 		return ret;
