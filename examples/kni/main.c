@@ -110,6 +110,8 @@ static uint32_t ports_mask = 0;
 /* Ports set in promiscuous mode off by default. */
 static int promiscuous_on = 0;
 
+static int kni_running;
+
 /* Structure type for recording kni interface specific stats */
 struct kni_interface_stats {
 	/* number of pkts received from NIC, and sent to KNI */
@@ -623,58 +625,45 @@ init_port(uint16_t port)
 }
 
 /* Check the link status of all ports in up to 9s, and print them finally */
-static void
-check_all_ports_link_status(uint32_t port_mask)
+static void *
+check_all_ports_link_status(void *arg)
 {
 #define CHECK_INTERVAL 100 /* 100ms */
 #define MAX_CHECK_TIME 90 /* 9s (90 * 100ms) in total */
 	uint16_t portid;
-	uint8_t count, all_ports_up, print_flag = 0;
 	struct rte_eth_link link;
+	const char *name;
+	char cmd[64];
+	unsigned int i;
+	struct kni_port_params **p = kni_port_params_array;
+	(void) arg;
 
-	printf("\nChecking link status\n");
-	fflush(stdout);
-	for (count = 0; count <= MAX_CHECK_TIME; count++) {
-		all_ports_up = 1;
+	RTE_ETH_FOREACH_DEV(portid) {
+		for (i = 0; i < p[portid]->nb_kni; i++) {
+			name = rte_kni_get_name(p[portid]->kni[i]);
+			snprintf(cmd, sizeof(cmd),
+					"/sbin/ifconfig %s up", name);
+			RTE_LOG(INFO, APP,
+					"Marking interface %s 'up'\n", name);
+			if (system(cmd) == -1)
+				RTE_LOG(ERR, APP,
+				  "Error: Failed to mark interface %s 'up'\n",
+						name);
+		}
+	}
+
+	while (kni_running) {
+		rte_delay_ms(CHECK_INTERVAL);
 		RTE_ETH_FOREACH_DEV(portid) {
-			if ((port_mask & (1 << portid)) == 0)
+			if ((ports_mask & (1 << portid)) == 0)
 				continue;
 			memset(&link, 0, sizeof(link));
 			rte_eth_link_get_nowait(portid, &link);
-			/* print link status if flag set */
-			if (print_flag == 1) {
-				if (link.link_status)
-					printf(
-					"Port%d Link Up - speed %uMbps - %s\n",
-						portid, link.link_speed,
-				(link.link_duplex == ETH_LINK_FULL_DUPLEX) ?
-					("full-duplex") : ("half-duplex\n"));
-				else
-					printf("Port %d Link Down\n", portid);
-				continue;
-			}
-			/* clear all_ports_up flag if any link down */
-			if (link.link_status == ETH_LINK_DOWN) {
-				all_ports_up = 0;
-				break;
-			}
-		}
-		/* after finally printing all link status, get out */
-		if (print_flag == 1)
-			break;
-
-		if (all_ports_up == 0) {
-			printf(".");
-			fflush(stdout);
-			rte_delay_ms(CHECK_INTERVAL);
-		}
-
-		/* set the print_flag if all ports up or timeout */
-		if (all_ports_up == 1 || count == (MAX_CHECK_TIME - 1)) {
-			print_flag = 1;
-			printf("done\n");
+			for (i = 0; i < p[portid]->nb_kni; i++)
+				rte_kni_update_link(p[portid]->kni[i], &link);
 		}
 	}
+	return NULL;
 }
 
 /* Callback for request of changing MTU */
@@ -896,6 +885,8 @@ main(int argc, char** argv)
 	int ret;
 	uint16_t nb_sys_ports, port;
 	unsigned i;
+	void *retval;
+	pthread_t kni_link_tid;
 
 	/* Associate signal_hanlder function with USR signals */
 	signal(SIGUSR1, signal_handler);
@@ -950,7 +941,14 @@ main(int argc, char** argv)
 
 		kni_alloc(port);
 	}
-	check_all_ports_link_status(ports_mask);
+
+	kni_running = 1;
+	ret = rte_ctrl_thread_create(&kni_link_tid,
+				     "KNI link status check", NULL,
+				     check_all_ports_link_status, NULL);
+	if (ret < 0)
+		rte_exit(EXIT_FAILURE,
+			"Could not create link status thread!\n");
 
 	/* Launch per-lcore function on every lcore */
 	rte_eal_mp_remote_launch(main_loop, NULL, CALL_MASTER);
@@ -958,6 +956,8 @@ main(int argc, char** argv)
 		if (rte_eal_wait_lcore(i) < 0)
 			return -1;
 	}
+	kni_running = 0;
+	pthread_join(kni_link_tid, &retval);
 
 	/* Release resources */
 	RTE_ETH_FOREACH_DEV(port) {
