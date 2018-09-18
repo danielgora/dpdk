@@ -790,6 +790,63 @@ rte_kni_unregister_handlers(struct rte_kni *kni)
 
 	return 0;
 }
+
+int __rte_experimental
+rte_kni_update_link(struct rte_kni *kni, struct rte_eth_link *link)
+{
+	char path[64];
+	char carrier[2];
+	const char *new_carrier;
+	int fd, ret;
+
+	if (kni == NULL || link == NULL)
+		return -1;
+
+	snprintf(path, sizeof(path), "/sys/devices/virtual/net/%s/carrier",
+		kni->name);
+
+	fd = open(path, O_RDWR);
+	if (fd == -1) {
+		RTE_LOG(ERR, KNI, "Failed to open file: %s.\n", path);
+		return -1;
+	}
+
+	ret = read(fd, carrier, 2);
+	if (ret < 1) {
+		/* Cannot read carrier until interface is marked
+		 * 'up', so don't log an error.
+		 */
+		close(fd);
+		return -1;
+	}
+
+	new_carrier = (link->link_status == ETH_LINK_UP) ? "1" : "0";
+	ret = write(fd, new_carrier, 1);
+	if (ret < 1) {
+		RTE_LOG(ERR, KNI, "Failed to write file: %s.\n", path);
+		close(fd);
+		return -1;
+	}
+
+	if (strncmp(carrier, new_carrier, 1)) {
+		if (link->link_status == ETH_LINK_UP) {
+			RTE_LOG(INFO, KNI, "%s NIC Link is Up %d Mbps %s %s.\n",
+				kni->name,
+				link->link_speed,
+				link->link_autoneg ? "(AutoNeg)" : "(Fixed)",
+				link->link_duplex ?
+					"Full Duplex" : "Half Duplex");
+		} else {
+			RTE_LOG(INFO, KNI, "%s NIC Link is Down.\n",
+				kni->name);
+		}
+	}
+
+	close(fd);
+
+	return 0;
+}
+
 void
 rte_kni_close(void)
 {

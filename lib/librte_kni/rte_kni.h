@@ -21,6 +21,7 @@
 #include <rte_memory.h>
 #include <rte_mempool.h>
 #include <rte_ether.h>
+#include <rte_ethdev.h>
 
 #include <exec-env/rte_kni_common.h>
 
@@ -227,6 +228,23 @@ int rte_kni_register_handlers(struct rte_kni *kni, struct rte_kni_ops *ops);
  *   On failure: -1
  */
 int rte_kni_unregister_handlers(struct rte_kni *kni);
+
+/**
+ * Update link status info for KNI port.
+ *
+ * Update the linkup/linkdown status of a KNI interface in the kernel.
+ *
+ * @param kni
+ *  pointer to struct rte_kni.
+ * @param link
+ *  pointer to struct rte_eth_link containing new interface status.
+ *
+ * @return
+ *  On success: 0
+ *  On failure: -1
+ */
+int __rte_experimental
+rte_kni_update_link(struct rte_kni *kni, struct rte_eth_link *link);
 
 /**
  *  Close KNI device.

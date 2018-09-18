@@ -121,6 +121,97 @@ kni_change_mtu(uint16_t port_id, unsigned int new_mtu)
 					 port_id, kni_pkt_mtu);
 	return 0;
 }
+
+static int
+kni_change_link(void)
+{
+	struct rte_eth_link link;
+	int ret;
+
+	link.link_speed = 10;
+	link.link_status = ETH_LINK_UP;
+	link.link_autoneg = ETH_LINK_AUTONEG;
+	link.link_duplex = ETH_LINK_FULL_DUPLEX;
+	ret = rte_kni_update_link(test_kni_ctx, &link);
+	if (ret != 0) {
+		printf("Failed to change link state to "
+				"Up/10Mbps/AutoNeg/Full ret=%d.\n", ret);
+		return -1;
+	}
+	rte_delay_ms(1000);
+
+	link.link_speed = 0;
+	link.link_status = ETH_LINK_DOWN;
+	link.link_autoneg = ETH_LINK_FIXED;
+	link.link_duplex = ETH_LINK_FULL_DUPLEX;
+	ret = rte_kni_update_link(test_kni_ctx, &link);
+	if (ret != 0) {
+		printf("Failed to change link state to Down ret=%d.\n", ret);
+		return -1;
+	}
+	rte_delay_ms(1000);
+
+	link.link_speed = 1000;
+	link.link_status = ETH_LINK_UP;
+	link.link_autoneg = ETH_LINK_AUTONEG;
+	link.link_duplex = ETH_LINK_HALF_DUPLEX;
+	ret = rte_kni_update_link(test_kni_ctx, &link);
+	if (ret != 0) {
+		printf("Failed to change link state to "
+				"Up/1Gbps/AutoNeg/Half ret=%d.\n", ret);
+		return -1;
+	}
+	rte_delay_ms(1000);
+
+	link.link_speed = 0;
+	link.link_status = ETH_LINK_DOWN;
+	link.link_autoneg = ETH_LINK_FIXED;
+	link.link_duplex = ETH_LINK_FULL_DUPLEX;
+	ret = rte_kni_update_link(test_kni_ctx, &link);
+	if (ret != 0) {
+		printf("Failed to change link state to Down ret=%d.\n", ret);
+		return -1;
+	}
+	rte_delay_ms(1000);
+
+	link.link_speed = 40000;
+	link.link_status = ETH_LINK_UP;
+	link.link_autoneg = ETH_LINK_FIXED;
+	link.link_duplex = ETH_LINK_FULL_DUPLEX;
+	ret = rte_kni_update_link(test_kni_ctx, &link);
+	if (ret != 0) {
+		printf("Failed to change link state to "
+				"Up/40Gbps/Fixed/Full ret=%d.\n", ret);
+		return -1;
+	}
+	rte_delay_ms(1000);
+
+	link.link_speed = 0;
+	link.link_status = ETH_LINK_DOWN;
+	link.link_autoneg = ETH_LINK_FIXED;
+	link.link_duplex = ETH_LINK_FULL_DUPLEX;
+	ret = rte_kni_update_link(test_kni_ctx, &link);
+	if (ret != 0) {
+		printf("Failed to change link state to Down ret=%d.\n", ret);
+		return -1;
+	}
+	rte_delay_ms(1000);
+
+	link.link_speed = 100000;
+	link.link_status = ETH_LINK_UP;
+	link.link_autoneg = ETH_LINK_FIXED;
+	link.link_duplex = ETH_LINK_FULL_DUPLEX;
+	ret = rte_kni_update_link(test_kni_ctx, &link);
+	if (ret != 0) {
+		printf("Failed to change link state to "
+				"Up/100Gbps/Fixed/Full ret=%d.\n", ret);
+		return -1;
+	}
+	rte_delay_ms(1000);
+
+	return 0;
+}
+
 /**
  * This loop fully tests the basic functions of KNI. e.g. transmitting,
  * receiving to, from kernel space, and kernel requests.
@@ -151,9 +242,16 @@ test_kni_loop(__rte_unused void *arg)
 			ret = -1;
 		if (system(IFCONFIG TEST_KNI_PORT" mtu 1400") == -1)
 			ret = -1;
+
+		ret = kni_change_link();
+		if (ret != 0) {
+			test_kni_processing_flag = 1;
+			return ret;
+		}
+		rte_delay_ms(KNI_TIMEOUT_MS);
 		if (system(IFCONFIG TEST_KNI_PORT" down") == -1)
 			ret = -1;
-		rte_delay_ms(KNI_TIMEOUT_MS);
+		rte_delay_ms(1000);
 		test_kni_processing_flag = 1;
 	} else if (lcore_id == lcore_ingress) {
 		struct rte_mempool *mp = test_kni_lookup_mempool();
