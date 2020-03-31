@@ -156,7 +156,7 @@ int rte_kni_release(struct rte_kni *kni);
  *  - -EINVAL: Invalid kni structure.
  *  - -EBUSY: KNI interface still in use.  Must call rte_kni_release().
  */
-int __rte_experimental
+int
 rte_kni_free(struct rte_kni *kni);
 
 /**
