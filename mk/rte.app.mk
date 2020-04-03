@@ -482,6 +482,16 @@ $(RTE_OUTPUT)/app/$(APP).map: $(APP)
 #
 # Clean all generated files
 #
+#$(warning _BUILD_TARGETS is $(_BUILD_TARGETS))
+#$(warning _INSTALL_TARGETS is $(_INSTALL_TARGETS))
+#$(warning _CLEAN_TARGETS is $(_CLEAN_TARGETS))
+#$(warning _INSTALL is $(_INSTALL))
+#$(warning APP is $(APP))
+#$(warning OBJS-all is $(OBJS-all))
+#$(warning DEPS-all is $(DEPS-all))
+#$(warning DEPSTMP-all is $(DEPSTMP-all))
+#$(warning CMDS-all is $(CMDS-all))
+#$(warning INSTALL-FILES-all is $(INSTALL-FILES-all))
 .PHONY: clean
 clean: _postclean
 	$(Q)rm -f $(_BUILD_TARGETS) $(_INSTALL_TARGETS) $(_CLEAN_TARGETS)
@@ -489,7 +499,8 @@ clean: _postclean
 .PHONY: doclean
 doclean:
 	$(Q)rm -rf $(APP) $(OBJS-all) $(DEPS-all) $(DEPSTMP-all) \
-	  $(CMDS-all) $(INSTALL-FILES-all) .$(APP).cmd $(APP).map
+	  $(CMDS-all) $(INSTALL-FILES-all) .$(APP).cmd $(APP).map \
+	  $(RTE_OUTPUT)/app/$(APP) $(RTE_OUTPUT)/app/$(APP).map
 
 
 include $(RTE_SDK)/mk/internal/rte.compile-post.mk
