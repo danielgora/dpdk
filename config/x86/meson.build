@@ -20,6 +20,13 @@ if cc.get_define('__SSE4_2__', args: machine_args) == ''
 	machine_args += '-msse4'
 endif
 
+# set -mrdseed if necessary so _rdseed32_step compiles if the
+# compilation host does not support the RDSEED instruction.
+if cc.get_define('__RDSEED__', args: machine_args) == '' and cc.has_argument('-mrdseed')
+	machine_args += '-mrdseed'
+	message('RDSEED not enabled by default, explicitly setting -mrdseed')
+endif
+
 base_flags = ['SSE', 'SSE2', 'SSE3','SSSE3', 'SSE4_1', 'SSE4_2']
 foreach f:base_flags
 	dpdk_conf.set('RTE_MACHINE_CPUFLAG_' + f, 1)

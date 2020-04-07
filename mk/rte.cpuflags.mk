@@ -53,6 +53,14 @@ endif
 
 ifneq ($(filter $(AUTO_CPUFLAGS),__RDSEED__),)
 CPUFLAGS += RDSEED
+else
+# If the native environment doesn't define __RDSEED__, see
+# if the compiler supports -mrdseed.
+RDSEED_CPUFLAGS := $(shell $(CC) $(MACHINE_CFLAGS) $(WERROR_FLAGS) $(EXTRA_CFLAGS) -mrdseed -dM -E - < /dev/null)
+ifneq ($(filter $(RDSEED_CPUFLAGS),__RDSEED__),)
+CPUFLAGS += RDSEED
+MACHINE_CFLAGS += -mrdseed
+endif
 endif
 
 ifneq ($(filter $(AUTO_CPUFLAGS),__FSGSBASE__),)
