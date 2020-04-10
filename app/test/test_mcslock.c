@@ -63,37 +63,39 @@ test_mcslock_per_core(__attribute__((unused)) void *arg)
 	return 0;
 }
 
-static uint64_t time_count[RTE_MAX_LCORE] = {0};
+static uint64_t lcount __rte_cache_aligned;
+static uint64_t lcore_count[RTE_MAX_LCORE] __rte_cache_aligned;
+static uint64_t time_cost[RTE_MAX_LCORE];
 
-#define MAX_LOOP 1000000
+#define MAX_LOOP 10000
 
 static int
 load_loop_fn(void *func_param)
 {
 	uint64_t time_diff = 0, begin;
 	uint64_t hz = rte_get_timer_hz();
-	volatile uint64_t lcount = 0;
 	const int use_lock = *(int *)func_param;
 	const unsigned int lcore = rte_lcore_id();
 
 	/**< Per core me node. */
 	rte_mcslock_t ml_perf_me = RTE_PER_LCORE(_ml_perf_me);
 
-	/* wait synchro */
-	while (rte_atomic32_read(&synchro) == 0)
-		;
+	/* wait synchro for slaves */
+	if (lcore != rte_get_master_lcore())
+		while (rte_atomic32_read(&synchro) == 0)
+			;
 
-	begin = rte_get_timer_cycles();
-	while (lcount < MAX_LOOP) {
+	begin = rte_rdtsc_precise();
+	while (lcore_count[lcore] < MAX_LOOP) {
 		if (use_lock)
 			rte_mcslock_lock(&p_ml_perf, &ml_perf_me);
-
+		lcore_count[lcore]++;
 		lcount++;
 		if (use_lock)
 			rte_mcslock_unlock(&p_ml_perf, &ml_perf_me);
 	}
-	time_diff = rte_get_timer_cycles() - begin;
-	time_count[lcore] = time_diff * 1000000 / hz;
+	time_diff = rte_rdtsc_precise() - begin;
+	time_cost[lcore] = time_diff * 1000000 / hz;
 	return 0;
 }
 
@@ -101,27 +103,28 @@ static int
 test_mcslock_perf(void)
 {
 	unsigned int i;
-	uint64_t total = 0;
+	uint64_t tcount = 0;
+	uint64_t total_time = 0;
 	int lock = 0;
 	const unsigned int lcore = rte_lcore_id();
 
 	printf("\nTest with no lock on single core...\n");
-	rte_atomic32_set(&synchro, 1);
 	load_loop_fn(&lock);
-	printf("Core [%u] Cost Time = %"PRIu64" us\n",
-			lcore, time_count[lcore]);
-	memset(time_count, 0, sizeof(time_count));
+	printf("Core [%u] cost time = %"PRIu64" us\n", lcore, time_cost[lcore]);
+	memset(lcore_count, 0, sizeof(lcore_count));
+	memset(time_cost, 0, sizeof(time_cost));
 
 	printf("\nTest with lock on single core...\n");
 	lock = 1;
-	rte_atomic32_set(&synchro, 1);
 	load_loop_fn(&lock);
-	printf("Core [%u] Cost Time = %"PRIu64" us\n",
-			lcore, time_count[lcore]);
-	memset(time_count, 0, sizeof(time_count));
+	printf("Core [%u] cost time = %"PRIu64" us\n", lcore, time_cost[lcore]);
+	memset(lcore_count, 0, sizeof(lcore_count));
+	memset(time_cost, 0, sizeof(time_cost));
 
-	printf("\nTest with lock on %u cores...\n", (rte_lcore_count()));
+	lcount = 0;
+	printf("\nTest with lock on %u cores...\n", rte_lcore_count());
 
+	/* Clear synchro and start slaves */
 	rte_atomic32_set(&synchro, 0);
 	rte_eal_mp_remote_launch(load_loop_fn, &lock, SKIP_MASTER);
 
@@ -132,12 +135,15 @@ test_mcslock_perf(void)
 	rte_eal_mp_wait_lcore();
 
 	RTE_LCORE_FOREACH(i) {
-		printf("Core [%u] Cost Time = %"PRIu64" us\n",
-				i, time_count[i]);
-		total += time_count[i];
+		printf("Core [%u] cost time = %"PRIu64" us\n", i, time_cost[i]);
+		tcount += lcore_count[i];
+		total_time += time_cost[i];
 	}
 
-	printf("Total Cost Time = %"PRIu64" us\n", total);
+	if (tcount != lcount)
+		return -1;
+
+	printf("Total cost time = %"PRIu64" us\n", total_time);
 
 	return 0;
 }
