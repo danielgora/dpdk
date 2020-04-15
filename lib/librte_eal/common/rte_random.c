@@ -25,8 +25,6 @@ struct rte_rand_state {
 
 static struct rte_rand_state rand_states[RTE_MAX_LCORE];
 
-__rte_weak int getentropy(void *__buffer, size_t __length);
-
 static uint32_t
 __rte_rand_lcg32(uint32_t *seed)
 {
@@ -178,38 +176,26 @@ rte_rand_max(uint64_t upper_bound)
 	return res;
 }
 
-/* Use rte_get_timer_cycles() if the system does not have
- * genentropy() or the rdseed instruction.
- */
-__rte_weak int
-getentropy(void *__buffer, size_t __length __rte_unused)
-{
-	uint64_t *ge_seed = __buffer;
-#ifdef RTE_MACHINE_CPUFLAG_RDSEED
-	if (rte_cpu_get_flag_enabled(RTE_CPUFLAG_RDSEED))
-		return -1;
-#endif
-	*ge_seed = rte_get_timer_cycles();
-	return 0;
-}
-
 static uint64_t
 __rte_random_initial_seed(void)
 {
 	int ge_rc;
 	uint64_t ge_seed;
+	extern int getentropy(void *__buffer, size_t __length) __rte_weak;
 
-	ge_rc = getentropy(&ge_seed, sizeof(ge_seed));
+	if (getentropy) {
+		ge_rc = getentropy(&ge_seed, sizeof(ge_seed));
 
-	if (ge_rc == 0)
-		return ge_seed;
+		if (ge_rc == 0)
+			return ge_seed;
+	}
 
 #ifdef RTE_MACHINE_CPUFLAG_RDSEED
-	unsigned int rdseed_low;
-	unsigned int rdseed_high;
-
 	/* first fallback: rdseed instruction, if available */
 	if (rte_cpu_get_flag_enabled(RTE_CPUFLAG_RDSEED)) {
+		unsigned int rdseed_low;
+		unsigned int rdseed_high;
+
 		if (_rdseed32_step(&rdseed_low) == 1 &&
 		    _rdseed32_step(&rdseed_high) == 1)
 			return (uint64_t)rdseed_low |
