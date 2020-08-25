@@ -137,6 +137,7 @@ bond_mode_alb_arp_xmit(struct rte_ether_hdr *eth_h, uint16_t offset,
 
 	struct rte_ether_addr bonding_mac;
 
+	memset(&bonding_mac, 0, sizeof(struct rte_ether_addr));
 	arp = (struct rte_arp_hdr *)((char *)(eth_h + 1) + offset);
 
 	/*
