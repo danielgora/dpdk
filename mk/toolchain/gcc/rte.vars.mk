@@ -72,6 +72,8 @@ TOOLCHAIN_LDFLAGS += -flto
 ifeq ($(shell test $(GCC_VERSION) -lt 80 && echo 1), 1)
 WERROR_FLAGS += -Wno-lto-type-mismatch
 endif
+# still needed with newer gcc (8.2.1 and 9.1)
+WERROR_FLAGS += -Wno-lto-type-mismatch -Wno-maybe-uninitialized
 endif
 
 # disable warning for non-initialised fields
