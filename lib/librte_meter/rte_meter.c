@@ -152,6 +152,15 @@ __rte_meter_trtcm_rfc4115_profile_config(
 	return 0;
 }
 
+#if defined RTE_BUILD_SHARED_LIB && defined RTE_ENABLE_LTO
+int
+rte_meter_trtcm_rfc4115_profile_config(
+	struct rte_meter_trtcm_rfc4115_profile *p,
+	struct rte_meter_trtcm_rfc4115_params *params)
+{
+	return __rte_meter_trtcm_rfc4115_profile_config(p, params);
+}
+#else
 int
 rte_meter_trtcm_rfc4115_profile_config_s(
 	struct rte_meter_trtcm_rfc4115_profile *p,
@@ -179,6 +188,7 @@ rte_meter_trtcm_rfc4115_profile_config_e(
 	return __rte_meter_trtcm_rfc4115_profile_config(p, params);
 }
 VERSION_SYMBOL_EXPERIMENTAL(rte_meter_trtcm_rfc4115_profile_config, _e);
+#endif
 
 /*
  *  ABI aliasing done for 'rte_meter_trtcm_rfc4115_config'
@@ -204,6 +214,14 @@ __rte_meter_trtcm_rfc4115_config(
 	return 0;
 }
 
+#if defined RTE_BUILD_SHARED_LIB && defined RTE_ENABLE_LTO
+int
+rte_meter_trtcm_rfc4115_config(struct rte_meter_trtcm_rfc4115 *m,
+	struct rte_meter_trtcm_rfc4115_profile *p)
+{
+	return __rte_meter_trtcm_rfc4115_config(m, p);
+}
+#else
 int
 rte_meter_trtcm_rfc4115_config_s(struct rte_meter_trtcm_rfc4115 *m,
 	struct rte_meter_trtcm_rfc4115_profile *p);
@@ -227,3 +245,4 @@ rte_meter_trtcm_rfc4115_config_e(struct rte_meter_trtcm_rfc4115 *m,
 	return __rte_meter_trtcm_rfc4115_config(m, p);
 }
 VERSION_SYMBOL_EXPERIMENTAL(rte_meter_trtcm_rfc4115_config, _e);
+#endif
