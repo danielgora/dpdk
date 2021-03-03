@@ -5,6 +5,7 @@ RUN yum -y install gcc git make diffutils numactl-devel which vim-common
 ARG dpdk_branch=adax_master
 ARG ncpus=8
 ARG enable_lto=n
+ARG makeflags=
 
 # Uncomment these lines to clone DPDK from somewhere.
 #WORKDIR /usr/local/share
@@ -17,4 +18,4 @@ RUN make T=x86_64-native-linux-gcc O=x86_64-native-linux-gcc config
 WORKDIR /usr/local/share/dpdk/x86_64-native-linux-gcc
 # Set RTE_ENABLE_LTO if requested..
 RUN if [ "$enable_lto" = "y" ]; then sed -i "s/RTE_ENABLE_LTO=.*/RTE_ENABLE_LTO=${enable_lto}/" .config; fi
-RUN make -j $ncpus
+RUN make -j $ncpus $makeflags
