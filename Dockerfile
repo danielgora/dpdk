@@ -1,8 +1,8 @@
-FROM centos:8
+FROM debian:bullseye-slim
 
-SHELL ["/bin/bash", "-l", "-c"]
-RUN yum -y install scl-utils gcc-toolset-9 git make diffutils numactl-devel which vim-common
-RUN echo "echo 'in bashrc'; source scl_source enable gcc-toolset-9" >> ~/.bashrc
+RUN apt-get update -y
+RUN apt-get install -y gcc git make diffutils libnuma-dev libnuma1 numactl xxd
+#RUN echo "echo 'in bashrc'; source scl_source enable gcc-toolset-9" >> ~/.bashrc
 RUN gcc --version
 
 ARG dpdk_branch=adax_master
