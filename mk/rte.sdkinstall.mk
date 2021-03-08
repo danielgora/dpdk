@@ -84,7 +84,6 @@ else
 	$(Q)$(MAKE) O=$(RTE_OUTPUT) T= install-runtime
 	$(Q)$(MAKE) O=$(RTE_OUTPUT) T= install-kmod
 	$(Q)$(MAKE) O=$(RTE_OUTPUT) T= install-sdk
-	$(Q)$(MAKE) O=$(RTE_OUTPUT) T= install-doc
 	@echo Installation in $(DESTDIR)$(prefix)/ complete
 endif
 
