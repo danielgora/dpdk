@@ -1,14 +1,14 @@
 FROM debian:bullseye-slim
 
-RUN apt-get update -y
-RUN apt-get install -y gcc git make diffutils libnuma-dev libnuma1 numactl xxd
-#RUN echo "echo 'in bashrc'; source scl_source enable gcc-toolset-9" >> ~/.bashrc
+RUN apt-get update -y && apt-get install -y gcc git make diffutils libnuma-dev xxd
 RUN gcc --version
 
+ARG dpdk_version=
 ARG dpdk_branch=adax_master
 ARG ncpus=8
 ARG enable_lto=n
 ARG makeflags=
+ARG machine_type=native
 
 # Uncomment these lines to clone DPDK from somewhere.
 #WORKDIR /usr/local/share
@@ -17,9 +17,12 @@ ARG makeflags=
 WORKDIR /usr/local/share/dpdk
 # Use this line to copy the dpdk directory from the local machine.
 COPY . .
-#RUN which gcc
 RUN make T=x86_64-native-linux-gcc O=x86_64-native-linux-gcc config
 WORKDIR /usr/local/share/dpdk/x86_64-native-linux-gcc
-# Set RTE_ENABLE_LTO if requested..
-RUN if [ "$enable_lto" = "y" ]; then sed -i "s/RTE_ENABLE_LTO=.*/RTE_ENABLE_LTO=${enable_lto}/" .config; fi
-RUN make -j $ncpus $makeflags
+
+RUN make -j $ncpus CONFIG_RTE_MACHINE=$machine_type CONFIG_RTE_ENABLE_LTO=$enable_lto $makeflags
+
+LABEL com.adax.dpdk.version="$dpdk_version" \
+      com.adax.dpdk.branch="$dpdk_branch" \
+      com.adax.dpdk.machine_type="$machine_type" \
+      com.adax.dpdk.enable_lto="$enable_lto"
